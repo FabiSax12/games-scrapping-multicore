@@ -5,7 +5,7 @@ python -m venv [nombre_entorno]
 ```
 
 ```bash
-.\[nombre_entorno]\Script\activate
+.\[nombre_entorno]\Scripts\activate
 ```
 
 ```bash
