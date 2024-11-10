@@ -9,57 +9,124 @@ def create_html():
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Scraped Data</title>
+        <title>Friki TEC</title>
         <style>
+            @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
             body {
-                font-family: Arial, sans-serif;
+                font-family: 'Press Start 2P', cursive;
                 margin: 0;
                 padding: 20px;
-                background-color: #f4f4f4;
+                background: radial-gradient(circle at center, #1a1a2e, #16213e, #0f3460);
+                color: #fff;
+                overflow-x: hidden;
             }
+
             h1 {
                 text-align: center;
-                color: #333;
+                color: #ff2e63;
+                font-size: 3em;
+                text-shadow: 0 0 8px #ff2e63, 0 0 16px #ff2e63;
+                margin: 20px 0;
             }
+
             .grid-container {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                max-width: 1200px;
+                margin: 0 auto;
                 gap: 20px;
                 padding: 20px;
             }
+
             .grid-item {
-                background-color: white;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                overflow: hidden;
+                position: relative;
+                background-color: #0f3460;
+                border: 2px solid #e94560;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4);
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
                 text-align: center;
-                transition: transform 0.3s ease;
             }
+
             .grid-item:hover {
                 transform: scale(1.05);
+                box-shadow: 0 6px 20px rgba(233, 69, 96, 0.6);
             }
+
             .grid-item img {
-                max-width: 100%;
+                max-width: 80%;
                 height: auto;
                 display: block;
+                border-radius: 8px;
+                margin-top: 10px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             }
+
             .grid-item h2 {
-                font-size: 18px;
+                font-size: 1.2em;
                 margin: 15px 0;
-                color: #555;
+                color: #ffde7d;
+                text-shadow: 0 0 6px #ffde7d;
             }
-            .grid-item a {
+
+            .prices {
+                width: 100%;
+                margin-top: 15px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                align-items: start;
+            }
+
+            .prices a {
+                color: #ffde7d;
                 text-decoration: none;
-                color: #0073e6;
+                font-weight: bold;
+                font-size: 1em;
+                transition: color 0.3s ease;
             }
-            .grid-item a:hover {
-                color: #005bb5;
+
+            .prices a:hover {
+                color: #ff2e63;
+                text-shadow: 0 0 8px #ff2e63;
+            }
+
+            .star-score {
+                position: absolute;
+                top: 2px;
+                right: 2px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #333;
+                font-weight: bold;
+                font-size: 14px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+
+                span {
+                    position: absolute;
+                    top: -6px;
+                    z-index: 10;
+                }
+            }
+
+            svg.star {
+                position: absolute;
+                z-index: 1;
+                fill: #ffd700;
+                width: 60px;
+                height: 60px;
             }
         </style>
     </head>
     <body>
-        <h1>Scraped Data</h1>
+        <h1>Friki Games</h1>
         <div class="grid-container"></div>
     </body>
     </html>
@@ -67,14 +134,13 @@ def create_html():
 
     soup = BeautifulSoup(base, 'html.parser')
 
-    # Cargar los resultados usando json.load()
     try:
         with open("results.json", "r") as file:
             results = json.load(file)
             grid_container = soup.find('div', class_='grid-container')
 
             for result in results:
-                grid_item = soup.new_tag('div', class_='grid-item')
+                grid_item = soup.new_tag('div', attrs={"class": 'grid-item'})
                 grid_container.append(grid_item)
 
                 # Agregar el título del juego
@@ -82,25 +148,48 @@ def create_html():
                 title.string = result['title']
                 grid_item.append(title)
 
-                # Agregar la imagen de Amazon (si está disponible) y hacerla un enlace al producto
+                # Agregar la imagen de Amazon si está disponible
                 amazon_info = result.get('amazon', None)
-                steam_info = result.get('steam', None)
-                if isinstance(amazon_info, dict) and 'img' in amazon_info:
-                    # Crear enlace a Amazon
-                    amazon_link = soup.new_tag('a', href=f"https://www.amazon.com/s?k={result['title'].replace(' ', '+')}")
-                    amazon_img = soup.new_tag('img', src=amazon_info['img'])
-                    amazon_link.append(amazon_img)
-                    grid_item.append(amazon_link)
-                elif isinstance(steam_info, dict) and 'img' in steam_info:
-                    # Crear enlace a Steam
-                    steam_link = soup.new_tag('a', href=f"https://store.steampowered.com/search/?term={result['title'].replace(' ', '+')}")
-                    steam_img = soup.new_tag('img', src=steam_info['img'])
-                    steam_link.append(steam_img)
-                    grid_item.append(steam_link)
+                if amazon_info and 'img' in amazon_info:
+                    img_tag = soup.new_tag('img', src=amazon_info['img'])
+                    grid_item.append(img_tag)
                 else:
                     no_image = soup.new_tag('p')
                     no_image.string = "Image not available"
                     grid_item.append(no_image)
+
+                # Puntaje de Metacritic en una estrella amarilla
+                metacritic_info = result.get('metacritic', None)
+                if metacritic_info and 'score' in metacritic_info:
+                    score_tag = soup.new_tag('div', attrs={"class": 'star-score'})
+                    star_svg = soup.new_tag('svg', viewBox="0 0 24 24", xmlns="http://www.w3.org/2000/svg", attrs={"class": "star"})
+                    star_polygon = soup.new_tag('polygon', points="12,2 15,9 22,9 16,14 18,21 12,17 6,21 8,14 2,9 9,9", fill="#FFD700")
+                    star_svg.append(star_polygon)
+                    score_tag.append(star_svg)
+                    score_span = soup.new_tag('span')
+                    score_span.append(metacritic_info['score'])
+                    score_tag.append(score_span)
+                    grid_item.append(score_tag)
+
+                # Crear la sección de precios e información adicional
+                prices_div = soup.new_tag('div', attrs={"class": 'prices'})
+
+                # Enlace y precio de Amazon
+                if amazon_info and 'price' in amazon_info:
+                    amazon_link = soup.new_tag('a', href=f"https://www.amazon.com/s?k={result['title'].replace(' ', '+')}")
+                    amazon_link.string = f"Amazon: ${amazon_info['price']}"
+                    prices_div.append(amazon_link)
+
+                # Precio de Best Buy
+                bestbuy_info = result.get('bestbuy', None)
+                if bestbuy_info and 'price' in bestbuy_info:
+                    bestbuy_link = soup.new_tag('a', href=f"https://www.bestbuy.com/site/searchpage.jsp?st={result['title'].replace(' ', '+')}")
+                    bestbuy_link.string = f"Best Buy: ${bestbuy_info['price']}"
+                    prices_div.append(bestbuy_link)
+
+                # Agregar la sección de precios e información adicional al grid_item
+                grid_item.append(prices_div)
+
     except FileNotFoundError:
         with open("results.json", "w") as file:
             json.dump([], file)
