@@ -1,6 +1,7 @@
 import os
 from bs4 import BeautifulSoup
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from howlongtobeatpy import *
 from html_generator import create_html
 import requests as req
 import time
@@ -9,10 +10,14 @@ import json
 import multiprocessing
 
 # Constants
-URL_METACRITIC = "https://www.metacritic.com"
-URL_STEAM = "https://store.steampowered.com"
 URL_AMAZON = "https://www.amazon.com"
+URL_METACRITIC = "https://www.metacritic.com"
 URL_BESTBUY = "https://www.bestbuy.com"
+URL_WALMART = "https://www.walmart.com"
+URL_STEAM = "https://store.steampowered.com"
+
+session = req.Session()
+hltb = HowLongToBeat()
 
 def scrape_amazon_game(title: str) -> dict:
     try:
@@ -20,7 +25,8 @@ def scrape_amazon_game(title: str) -> dict:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive"
+            "Connection": "keep-alive",
+            "Cookie": 'session-id=143-1980534-0337528; session-id-time=2082787201l; i18n-prefs=USD; sp-cdn="L5Z9:CR"; ubid-main=134-4428424-6385324; lc-main=es_US; session-token=eAHhEebfZOKNZCFjEtTER7imNeXBtgWZspEFTg0PwjBI2wF5x8pqOJpgvVah9oUN9b/9qKqzc2jzyKpvdT/amshWLCwkemFrRy8YcW+9brHt/siQr69ABNb5/xe+wbnWi25rgKvaCNVAK3qN9HgSoJByzfaLV0WOpkXkAoRp6t8RvE3eL652QO+0dufx9k/VNAK8yjB74sXBhfPmkEmUiQs0HeioPS16GvC86BYzj1lymhFuTv3bYn4bhLoDPfEuv6IM565jD7AU3FbrHVnfiZdB99xsdc6qzpgxcK4EynfCf9G5Yy1auVPyNyMHrew0vA44QudvUgbwXjWowwDhob9AqCYf+PFv; csm-hit=tb:2MS5PR7W54Y5RWQTNEGK+s-D9B0X537AWVCJTGVQ95S|1731309958139&t:1731309958139&adb:adblk_yes'
         }
 
         search_title = title.replace(' ', '+')
@@ -64,34 +70,6 @@ def scrape_amazon_game(title: str) -> dict:
     except Exception as e:
         return {"title": title, "amazon_error": str(e)}
 
-def scrape_steam_game(title: str) -> dict:
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9"
-        }
-
-        search_title = title.replace(' ', '+')
-        steam_url = f"{URL_STEAM}/search/?term={search_title}"
-
-        response = req.get(steam_url, headers=headers, timeout=5)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        product = soup.find('a', {'class': 'search_result_row'})
-
-        if product:
-            product_image = product.find("img")['src']
-            product_title = product.find("span", {'class': 'title'}).text
-
-            return {"title": title, "steam": {"title": product_title, "img": product_image} }
-        else:
-            return {"title": title, "steam_error": "Product not found"}
-
-    except Exception as e:
-        return {"title": title, "steam_error": str(e)}
-
 def scrape_metacritic_game(title: str) -> dict:
     try:
         headers = {
@@ -102,9 +80,7 @@ def scrape_metacritic_game(title: str) -> dict:
         search_title = title.replace(' ', '-').lower().replace(':', '')
         metacritic_url = f"{URL_METACRITIC}/game/{search_title}"
 
-        print(metacritic_url)
-
-        response = req.get(metacritic_url, headers=headers, timeout=5)
+        response = session.get(metacritic_url, headers=headers, timeout=5)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -123,32 +99,22 @@ def scrape_metacritic_game(title: str) -> dict:
 
 def scrape_howlongtobeat_game(title: str) -> dict:
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/"
-        }
+        res = hltb.search(title, SearchModifiers.HIDE_DLC)
 
-        search_title = title.replace(' ', '+')
-        hltb_url = f"https://howlongtobeat.com/?q={search_title}"
-
-        print(hltb_url)
-
-        response = req.get(hltb_url, headers=headers, timeout=5)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        game = soup.find('li', {'class': 'GameCard_search_list__IuMbi'})
-
-        print(game)
-
-        if game:
-            main_time = game.find("div", {'class': 'GameCard_search_list_tidbit__0r_OP center time_100'}).text
-
-            return {"title": title, "howlongtobeat": {"time": main_time} }
+        if res is not None and len(res) > 0:
+            return {
+                "title": title,
+                "howlongtobeat": {
+                    "main_story": res[0].main_story if res[0].main_story is not None else "Not available",
+                    "extras": res[0].main_extra if res[0].main_extra is not None else "Not available",
+                    "completionist": res[0].completionist if res[0].completionist is not None else "Not available"
+                }
+            }
         else:
             return {"title": title, "howlongtobeat_error": "Game not found"}
 
     except Exception as e:
+        print(f"Error: {e}")
         return {"title": title, "howlongtobeat_error": str(e)}
 
 def scrape_bestbuy_game(title: str) -> dict:
@@ -164,9 +130,7 @@ def scrape_bestbuy_game(title: str) -> dict:
         search_title = title.replace(' ', '+')
         bestbuy_url = f"{URL_BESTBUY}/site/searchpage.jsp?qp=category_facet%3DAll%20Video%20Games~pcmcat1487698928729&st={search_title}"
 
-        print(bestbuy_url)
-
-        response = req.get(bestbuy_url, headers=headers, timeout=5)
+        response = session.get(bestbuy_url, headers=headers, timeout=5)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -177,25 +141,110 @@ def scrape_bestbuy_game(title: str) -> dict:
         if product:
             product_price_div = product.find("div", {'class': 'priceView-customer-price'})
             product_price = product_price_div.find("span").text[1:]
+            product_img = product.find("img", {'class': 'product-image'})
 
-            return {"title": title, "bestbuy": {"price": product_price} }
+            if product_img:
+                product_img = product_img["src"]
+
+
+            return {"title": title, "bestbuy": {"price": product_price, "img": product_img} }
         else:
             return {"title": title, "bestbuy_error": "Product not found"}
 
     except Exception as e:
         return {"title": title, "bestbuy_error": str(e)}
 
+def scrape_walmart_game(title: str) -> dict:
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.199 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "DNT": "1",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1"
+        }
+
+        search_title = title.replace(' ', '+')
+        walmart_url = f"{URL_WALMART}/search?q={search_title}&facet=facet_product_type%3AVideo+Games"
+
+        response = session.get(walmart_url, headers=headers, timeout=5)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        print(soup)
+
+        product = soup.find('div', {"class": "sans-serif mid-gray relative flex flex-column w-100 hide-child-opacity"})
+
+        if product:
+            product_image = product.find("img", {"data-testid": "productTileImage"})
+            product_price_div = product.find("span", {"class": "mr1 mr2-xl b black lh-copy f5 f4-l"})
+
+            if product_image:
+                product_image = product_image['src']
+            else:
+                product_image = "Image not available"
+
+            if product_price_div:
+                product_price = product_price_div.text.replace("$", "")
+            else:
+                product_price = "Price not available"
+
+            return {"title": title, "walmart": {"img": product_image, "price": product_price} }
+        else:
+            return {"title": title, "walmart_error": "Product not found"}
+
+    except Exception as e:
+        return {"title": title, "walmart_error": str(e)}
+
+def scrape_steam_game(title: str) -> dict:
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+
+        search_title = title.replace(' ', '+')
+        steam_url = f"{URL_STEAM}/search/?term={search_title}"
+
+        response = req.get(steam_url, headers=headers, timeout=5)
+        response.raise_for_status()
+
+        print("Steam scrapping: ", title)
+
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        product = soup.find('a', {'class': 'search_result_row'})
+
+        if product:
+            product_image = product.find("img")['src']
+            product_title = product.find("span", {'class': 'title'}).text
+
+            return {"title": title, "steam": {"title": product_title, "img": product_image} }
+        else:
+            return {"title": title, "steam_error": "Product not found"}
+
+    except Exception as e:
+        return {"title": title, "steam_error": str(e)}
+
 def scrape_all_sources(title: str) -> dict:
     with ThreadPoolExecutor(max_workers=3) as executor:
         future_amazon = executor.submit(scrape_amazon_game, title)
         future_bestbuy = executor.submit(scrape_bestbuy_game, title)
-        # future_steam = executor.submit(scrape_steam_game, title)
+        future_steam = executor.submit(scrape_steam_game, title)
+
         future_metacritic = executor.submit(scrape_metacritic_game, title)
         # future_howlongtobeat = executor.submit(scrape_howlongtobeat_game, title)
 
         amazon_data = future_amazon.result()
         bestbuy_data = future_bestbuy.result()
-        # steam_data = future_steam.result()
+        steam_data = future_steam.result()
+
         metacritic_data = future_metacritic.result()
         # howlongtobeat_data = future_howlongtobeat.result()
 
@@ -203,7 +252,7 @@ def scrape_all_sources(title: str) -> dict:
         "title": title,
         "amazon": amazon_data.get("amazon", amazon_data.get("amazon_error")),
         "bestbuy": bestbuy_data.get("bestbuy", bestbuy_data.get("bestbuy_error")),
-        # "steam": steam_data.get("steam", steam_data.get("steam_error")),
+        "steam": steam_data.get("steam", steam_data.get("steam_error")),
         "metacritic": metacritic_data.get("metacritic", metacritic_data.get("metacritic_error")),
         # "howlongtobeat": howlongtobeat_data.get("howlongtobeat", howlongtobeat_data.get("howlongtobeat_error"))
     }
@@ -211,7 +260,7 @@ def scrape_all_sources(title: str) -> dict:
     return combined_data
 
 def run_parallel_scraping(titles: list[str]) -> list[dict]:
-    max_workers = os.cpu_count()  # Optimiza según tu CPU
+    max_workers = os.cpu_count()
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         print("Starting scraping...")
         results = list(executor.map(scrape_all_sources, titles))
@@ -223,14 +272,16 @@ def run_parallel_scraping(titles: list[str]) -> list[dict]:
     return results
 
 if __name__ == '__main__':
+
+    multiprocessing.set_start_method('spawn')
+
     while(True):
-        multiprocessing.set_start_method('spawn')  # Establece el método de inicio a 'spawn'
         titles = []
 
         with open("games.csv") as file:
             reader = csv.reader(file)
             titles = [row[0] for row in reader]
-            titles.pop(0)  # Si tienes un encabezado en tu CSV
+            titles.pop(0)
 
         print(f"Scraping {len(titles)} games...")
 
@@ -242,5 +293,5 @@ if __name__ == '__main__':
 
         create_html()
 
-        time.sleep(600)
+        time.sleep(60)
 
