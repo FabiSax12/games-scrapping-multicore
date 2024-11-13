@@ -84,17 +84,33 @@ def create_html():
                 align-items: start;
             }
 
-            .prices a {
+            .prices a, .htlb p {
                 color: #ffde7d;
                 text-decoration: none;
                 font-weight: bold;
-                font-size: 1em;
+                font-size: .7em;
                 transition: color 0.3s ease;
             }
 
-            .prices a:hover {
+            .prices a:hover, .prices a:focus , .htlb p:hover, .htlb p:focus {
                 color: #ff2e63;
                 text-shadow: 0 0 8px #ff2e63;
+            }
+
+            .hltb {
+                width: 100%;
+                margin-top: 30px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                align-items: start;
+                color: #ffde7d;
+
+                p {
+                    font-size: .7em;
+                    font-weight: bold;
+                    margin: 0;
+                }
             }
 
             .star-score {
@@ -150,8 +166,17 @@ def create_html():
 
                 # Agregar la imagen de Amazon si está disponible
                 amazon_info = result.get('amazon', None)
+                bestbuy_info = result.get('bestbuy', None)
+                steam_info = result.get('steam', None)
+
                 if amazon_info and 'img' in amazon_info:
                     img_tag = soup.new_tag('img', src=amazon_info['img'])
+                    grid_item.append(img_tag)
+                elif bestbuy_info and 'img' in bestbuy_info:
+                    img_tag = soup.new_tag('img', src=bestbuy_info['img'])
+                    grid_item.append(img_tag)
+                elif steam_info and 'img' in steam_info:
+                    img_tag = soup.new_tag('img', src=steam_info['img'])
                     grid_item.append(img_tag)
                 else:
                     no_image = soup.new_tag('p')
@@ -181,14 +206,42 @@ def create_html():
                     prices_div.append(amazon_link)
 
                 # Precio de Best Buy
-                bestbuy_info = result.get('bestbuy', None)
                 if bestbuy_info and 'price' in bestbuy_info:
                     bestbuy_link = soup.new_tag('a', href=f"https://www.bestbuy.com/site/searchpage.jsp?st={result['title'].replace(' ', '+')}")
                     bestbuy_link.string = f"Best Buy: ${bestbuy_info['price']}"
                     prices_div.append(bestbuy_link)
 
+                if steam_info and 'price' in steam_info:
+                    steam_link = soup.new_tag(
+                        'a',
+                        href=f"https://store.steampowered.com/search/?term={result['title'].replace(' ', '+')}"
+                    )
+                    steam_price_text = f"Steam: {steam_info['price']}"
+                    if 'discount' in steam_info and steam_info['discount'] != "No discount":
+                        steam_price_text += f" ({steam_info['discount']} off)"
+
+                    steam_link.string = steam_price_text
+                    prices_div.append(steam_link)
+
+                # HowLongToBeat
+                hltb_div = soup.new_tag('div', attrs={"class": 'hltb'})
+
+                hltb_info = result.get('howlongtobeat', None)
+                if hltb_info and 'main_story' in hltb_info:
+                    hltb_main = soup.new_tag('p')
+                    hltb_main.string = f"Main Story: {hltb_info['main_story']}h"
+                    hltb_extra = soup.new_tag('p')
+                    hltb_extra.string = f"Main + Extra: {hltb_info['extras']}h"
+                    hltb_completionist = soup.new_tag('p')
+                    hltb_completionist.string = f"Completionist: {hltb_info['completionist']}h"
+
+                    hltb_div.append(hltb_main)
+                    hltb_div.append(hltb_extra)
+                    hltb_div.append(hltb_completionist)
+
                 # Agregar la sección de precios e información adicional al grid_item
                 grid_item.append(prices_div)
+                grid_item.append(hltb_div)
 
     except FileNotFoundError:
         with open("results.json", "w") as file:
