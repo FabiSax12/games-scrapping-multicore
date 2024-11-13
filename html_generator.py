@@ -201,25 +201,19 @@ def create_html():
 
                 # Enlace y precio de Amazon
                 if amazon_info and 'price' in amazon_info:
-                    amazon_link = soup.new_tag('a', href=f"https://www.amazon.com/s?k={result['title'].replace(' ', '+')}")
+                    amazon_link = soup.new_tag('a', href=f"https://www.amazon.com/s?k={result['title'].replace(' ', '+')}", target="_blank")
                     amazon_link.string = f"Amazon: ${amazon_info['price']}"
                     prices_div.append(amazon_link)
 
                 # Precio de Best Buy
                 if bestbuy_info and 'price' in bestbuy_info:
-                    bestbuy_link = soup.new_tag('a', href=f"https://www.bestbuy.com/site/searchpage.jsp?st={result['title'].replace(' ', '+')}")
+                    bestbuy_link = soup.new_tag('a', href=f"https://www.bestbuy.com/site/searchpage.jsp?st={result['title'].replace(' ', '+')}", target="_blank")
                     bestbuy_link.string = f"Best Buy: ${bestbuy_info['price']}"
                     prices_div.append(bestbuy_link)
 
                 if steam_info and 'price' in steam_info:
-                    steam_link = soup.new_tag(
-                        'a',
-                        href=f"https://store.steampowered.com/search/?term={result['title'].replace(' ', '+')}"
-                    )
-                    steam_price_text = f"Steam: {steam_info['price']}"
-                    if 'discount' in steam_info and steam_info['discount'] != "No discount":
-                        steam_price_text += f" ({steam_info['discount']} off)"
-
+                    steam_link = soup.new_tag('a',href=f"https://store.steampowered.com/search/?term={result['title'].replace(' ', '+')}", target="_blank")
+                    steam_price_text = f"Steam: ${steam_info['price']}"
                     steam_link.string = steam_price_text
                     prices_div.append(steam_link)
 

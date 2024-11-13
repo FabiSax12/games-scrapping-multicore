@@ -206,7 +206,8 @@ def scrape_steam_game(title: str) -> dict:
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9"
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cookie": "wants_mature_content=1; steamCountry=CR%7C7766a1642d661cbc747d8a96600ca0d1; browserid=380085606837331937; sessionid=142d458a40ff9eb0c72c008b; timezoneOffset=-21600,0; birthtime=1108188001; lastagecheckage=12-February-2005; recentapps=%7B%22292030%22%3A1731519057%7D; app_impressions=2300320@1_4_4__118|473930@1_4_4__125|2996040@1_7_15__13|105600@1_7_15__13|2513280@1_7_15__13|440@1_7_15__13|2510960@1_7_15__13|2429640@1_7_15__13|570@1_7_15__13|730@1_7_15__13|3188550@1_7_15__13|1222670@1_7_15__13|2141910@1_7_15__13|1286220@1_7_15__13|271590@1_7_15__13|1845910@1_7_15__13|292030:378649:378648@1_7_15__13|2530490@1_7_15__13|210970@1_7_15__13|20920@1_7_15__13|20900@1_7_15__13|20900@1_5_9__412|20920@1_5_9__412|292030@1_5_9__412"
         }
 
         search_title = title.replace(' ', '+')
@@ -215,25 +216,41 @@ def scrape_steam_game(title: str) -> dict:
         response = req.get(steam_url, headers=headers, timeout=5)
         response.raise_for_status()
 
-        print("Steam scrapping: ", title)
-
         soup = BeautifulSoup(response.content, 'html.parser')
 
         product = soup.find('a', {'class': 'search_result_row'})
 
         if product:
-            product_image = product.find("img")['src']
             product_title = product.find("span", {'class': 'title'}).text
 
-            return {"title": title, "steam": {"title": product_title, "img": product_image} }
+            print(product_title.lower(), title.lower(), product_title.lower().find(title.lower()))
+
+            if product_title.lower().replace(":", "").find(title.lower().replace(":", "")) == -1:
+                return {"title": title, "steam": {"title": product_title, "img": None, "price": "Not found"} }
+
+            product_image = product.find("img")['src']
+            product_title = product.find("span", {'class': 'title'}).text
+            price = product.find("div", {"class": "discount_final_price"})
+
+            if price:
+                price: str = price.text.strip()
+                if price != "Free":
+                    price = price.replace("₡", "")
+                    price = price.replace(".", "")
+                    price = price.split(",")[0]
+                    if price.isnumeric():
+                        price = int(price)
+                        price = f"{(price / 530):.2f}"
+
+            return {"title": title, "steam": {"title": product_title, "img": product_image, "price": price} }
         else:
-            return {"title": title, "steam_error": "Product not found"}
+            return {"title": title, "steam_error": "Not found"}
 
     except Exception as e:
         return {"title": title, "steam_error": str(e)}
 
 def scrape_all_sources(title: str) -> dict:
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         future_amazon = executor.submit(scrape_amazon_game, title)
         future_bestbuy = executor.submit(scrape_bestbuy_game, title)
         future_steam = executor.submit(scrape_steam_game, title)
@@ -293,5 +310,5 @@ if __name__ == '__main__':
 
         create_html()
 
-        time.sleep(60)
+        time.sleep(80)
 
